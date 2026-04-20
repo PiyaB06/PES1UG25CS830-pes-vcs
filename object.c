@@ -94,6 +94,36 @@ int object_exists(const ObjectID *id) {
 //
 // Returns 0 on success, -1 on error.
 int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out) {
+    // 1. Convert the ObjectType enum to a string ("blob", "tree", or "commit")
+    const char *type_str = (type == OBJ_BLOB) ? "blob" : 
+                           (type == OBJ_TREE) ? "tree" : "commit";
+
+    // 2. Prepare the header
+    char header[64];
+    int header_len = snprintf(header, sizeof(header), "%s %zu", type_str, len) + 1; 
+
+    // 3. Combine Header and Data for Hashing
+    size_t full_size = header_len + len;
+    unsigned char *full_data = malloc(full_size);
+    if (!full_data) return -1;
+
+    memcpy(full_data, header, header_len);
+    memcpy(full_data + header_len, data, len);
+
+    // 4. Calculate SHA-256 Hash
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256(full_data, full_size, hash);
+
+    // 5. Convert binary hash to the hex string (ObjectID)
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+        sprintf(id_out->hex + (i * 2), "%02x", hash[i]);
+    }
+
+    // Temporary: We will add the "File Writing" logic in the next step!
+    // For now, let's just free the memory and return success to test hashing.
+    free(full_data);
+    return 0;
+}int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out) {
     // TODO: Implement
     (void)type; (void)data; (void)len; (void)id_out;
     return -1;
