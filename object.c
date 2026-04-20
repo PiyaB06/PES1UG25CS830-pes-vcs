@@ -119,15 +119,45 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
         sprintf(id_out->hex + (i * 2), "%02x", hash[i]);
     }
 
-    // Temporary: We will add the "File Writing" logic in the next step!
-    // For now, let's just free the memory and return success to test hashing.
+    // 6. Sharding: Prepare directory and file paths
+    // Path format: .pes/objects/ab/cdef... (where ab are first 2 chars)
+    char dir_path[PATH_MAX];
+    char file_path[PATH_MAX];
+    snprintf(dir_path, sizeof(dir_path), ".pes/objects/%.2s", id_out->hex);
+    snprintf(file_path, sizeof(file_path), "%s/%s", dir_path, id_out->hex + 2);
+
+    // 7. Create directories
+    mkdir(".pes/objects", 0755); 
+    mkdir(dir_path, 0755);
+
+    // 8. Atomic Write: Write to temp file then rename
+    char temp_path[PATH_MAX];
+    snprintf(temp_path, sizeof(temp_path), "%s/tmp_XXXXXX", dir_path);
+    int fd = mkstemp(temp_path);
+    if (fd == -1) {
+        free(full_data);
+        return -1;
+    }
+
+    if (write(fd, full_data, full_size) != (ssize_t)full_size) {
+        close(fd);
+        unlink(temp_path);
+        free(full_data);
+        return -1;
+    }
+    close(fd);
+
+    // Rename temp file to final hash-based name
+    if (rename(temp_path, file_path) != 0) {
+        unlink(temp_path);
+        free(full_data);
+        return -1;
+    }
+
     free(full_data);
     return 0;
-}int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out) {
-    // TODO: Implement
-    (void)type; (void)data; (void)len; (void)id_out;
-    return -1;
 }
+
 
 // Read an object from the store.
 //
